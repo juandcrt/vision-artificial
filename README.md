@@ -90,7 +90,7 @@ El resto de umbrales (brillo, nitidez, ángulos, ventana de vivacidad) está en 
 | Estado | Significado |
 |---|---|
 | ⚪ Sin rostro | No hay nadie frente a la cámara |
-| 🔴 Observado | Hay rostro pero falla una condición (varios rostros, oscuridad, borroso, lejos, de perfil, confianza baja) |
+| 🔴 Observado | Hay rostro pero falla una condición (varios rostros, oscuridad, borroso, lejos, de perfil, cabeza inclinada, confianza baja) |
 | 🟡 Verificando | Todo correcto; falta el parpadeo o mantener la posición unos instantes |
 | 🟢 Validado | Persona real, frontal, nítida y estable |
 
@@ -103,6 +103,7 @@ El resto de umbrales (brillo, nitidez, ángulos, ventana de vivacidad) está en 
 | Iluminación | brillo medio del rostro entre 60 y 210 | OpenCV (escala de grises) |
 | Nitidez | varianza del Laplaciano ≥ 40 | OpenCV |
 | Mirada frontal | giro e inclinación ≤ 20° | Matriz de transformación facial (MediaPipe) |
+| Cabeza recta | rotación lateral (roll) ≤ 20° | Matriz de transformación facial (MediaPipe) |
 | Prueba de vida | parpadeo en los últimos 8 s | Blendshapes `eyeBlinkLeft/Right` (MediaPipe) |
 | Estabilidad | 5 fotogramas válidos seguidos | Motor de reglas |
 

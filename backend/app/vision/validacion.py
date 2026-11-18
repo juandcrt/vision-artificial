@@ -80,6 +80,8 @@ def evaluar(rostros: list[dict], sesion: EstadoSesion | None = None, modo: str =
         ("frontal", "Mirada frontal",
          pose is not None and abs(pose["yaw"]) <= cfg.yaw_max and abs(pose["pitch"]) <= cfg.pitch_max,
          "Mire de frente a la cámara."),
+        ("recta", "Cabeza recta", pose is not None and abs(pose["roll"]) <= cfg.roll_max,
+         "Enderece la cabeza."),
     ]
     vivo = sesion.ultimo_parpadeo > 0 and (ahora - sesion.ultimo_parpadeo) <= cfg.ventana_vivacidad_s
     checks.append(("vivacidad", "Prueba de vida (parpadeo)", vivo, "Parpadee para confirmar que es una persona real."))

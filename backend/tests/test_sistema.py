@@ -13,13 +13,13 @@ from app.vision.validacion import (OBSERVADO, SIN_ROSTRO, VALIDADO, VERIFICANDO,
 CFG = Config()
 
 
-def rostro(confianza=0.95, ancho=0.3, brillo=120, nitidez=150, yaw=0, pitch=0, blink=0.0):
+def rostro(confianza=0.95, ancho=0.3, brillo=120, nitidez=150, yaw=0, pitch=0, roll=0, blink=0.0):
     return {
         "id": 0, "confianza": confianza,
         "caja": {"x": 0.3, "y": 0.2, "ancho": ancho, "alto": ancho * 1.2},
         "puntos_clave": [], "malla": None,
         "calidad": {"brillo": brillo, "contraste": 40, "nitidez": nitidez, "tamano": ancho},
-        "pose": {"yaw": yaw, "pitch": pitch, "roll": 0},
+        "pose": {"yaw": yaw, "pitch": pitch, "roll": roll},
         "gestos": {"eyeBlinkLeft": blink, "eyeBlinkRight": blink},
     }
 
@@ -38,6 +38,7 @@ def test_multiples_rostros_observado():
 @pytest.mark.parametrize("kw,texto", [
     ({"brillo": 20}, "Iluminación"), ({"nitidez": 5}, "borrosa"),
     ({"ancho": 0.05}, "Acérquese"), ({"yaw": 40}, "frente"), ({"confianza": 0.5}, "Confianza"),
+    ({"roll": 30}, "Enderece"), ({"roll": -30}, "Enderece"),
 ])
 def test_fallas_de_calidad(kw, texto):
     r = evaluar([rostro(**kw)], EstadoSesion())

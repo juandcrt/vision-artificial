@@ -59,6 +59,7 @@ class Config:
     nitidez_min: float = 40.0          # varianza del Laplaciano (rostro normalizado a 128 px)
     yaw_max: float = 20.0              # grados (giro izquierda/derecha)
     pitch_max: float = 20.0            # grados (arriba/abajo)
+    roll_max: float = 20.0             # grados (cabeza inclinada hacia un hombro)
     umbral_ojo_cerrado: float = 0.45   # blendshape eyeBlink
     ventana_vivacidad_s: float = 8.0   # el parpadeo debe ocurrir en esta ventana
     frames_estables: int = 5           # frames válidos consecutivos para aprobar

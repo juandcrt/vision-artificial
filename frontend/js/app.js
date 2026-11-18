@@ -71,14 +71,17 @@ function conectar() {
     enviarConfig();
   };
   ws.onclose = () => {
+    // Una conexión reemplazada (botón Conectar) se cierra después de abrir la nueva:
+    // no debe marcar "desconectado" ni tocar el estado de la conexión vigente.
+    if (estado.ws !== ws) return;
     chip("chipServidor", "error", "desconectado");
     liberarEnvios();
-    if (estado.ws !== ws) return; // se reemplazó por una conexión nueva
     const espera = Math.min(1000 * 2 ** estado.reintentos++, 10000);
     setTimeout(() => estado.ws === ws && conectar(), espera);
   };
-  ws.onerror = () => chip("chipServidor", "error", "error");
+  ws.onerror = () => estado.ws === ws && chip("chipServidor", "error", "error");
   ws.onmessage = (ev) => {
+    if (estado.ws !== ws) return; // respuestas tardías de una conexión reemplazada
     const msg = JSON.parse(ev.data);
     switch (msg.tipo) {
       case "bienvenida":

@@ -212,3 +212,26 @@ td.vacio { text-align: center; color: var(--tenue); padding: 20px; }
 }
 .aviso.visible { opacity: 1; transform: translate(-50%, 0); }
 .aviso.error { border-left-color: var(--error); }
+
+/* ---------- Aviso de actualización del sistema ---------- */
+.banner-actualizacion {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin: 12px 24px 0; padding: 10px 14px; border-radius: var(--radio);
+  background: color-mix(in srgb, var(--ok) 12%, var(--tarjeta));
+  border: 1px solid color-mix(in srgb, var(--ok) 45%, var(--borde));
+  animation: entrar-banner .3s ease-out;
+}
+.banner-actualizacion[hidden] { display: none; }
+.banner-actualizacion.pendiente {
+  background: color-mix(in srgb, var(--acento) 12%, var(--tarjeta));
+  border-color: color-mix(in srgb, var(--acento) 45%, var(--borde));
+}
+.banner-actualizacion #bannerTexto { flex: 1; min-width: 200px; }
+.banner-icono { font-size: 18px; color: var(--ok); }
+.banner-actualizacion.pendiente .banner-icono { color: var(--acento); }
+.banner-cerrar {
+  background: none; border: 0; color: var(--tenue); font-size: 16px; cursor: pointer; padding: 4px;
+}
+.banner-cerrar:hover { color: var(--texto); }
+@keyframes entrar-banner { from { opacity: 0; transform: translateY(-6px); } }
+@media (max-width: 600px) { .banner-actualizacion { margin: 12px 16px 0; } }

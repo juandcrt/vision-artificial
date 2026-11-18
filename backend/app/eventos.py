@@ -11,6 +11,7 @@ from pathlib import Path
 class RegistroEventos:
     def __init__(self, ruta: Path | str):
         self._lock = threading.Lock()
+        Path(ruta).parent.mkdir(parents=True, exist_ok=True)
         self._con = sqlite3.connect(str(ruta), check_same_thread=False)
         self._con.execute(
             """CREATE TABLE IF NOT EXISTS eventos (

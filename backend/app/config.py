@@ -8,6 +8,10 @@ from pathlib import Path
 RAIZ_BACKEND = Path(__file__).resolve().parent.parent
 RAIZ_PROYECTO = RAIZ_BACKEND.parent
 
+# En Vercel el código es de solo lectura: modelos y bitácora van a /tmp (efímero)
+EN_VERCEL = bool(os.getenv("VERCEL"))
+RAIZ_DATOS = Path("/tmp/vision-facial-ia") if EN_VERCEL else RAIZ_BACKEND
+
 
 def _env_float(nombre: str, defecto: float) -> float:
     try:
@@ -26,9 +30,9 @@ def _env_int(nombre: str, defecto: int) -> int:
 @dataclass(frozen=True)
 class Config:
     # --- Rutas ---
-    dir_modelos: Path = RAIZ_BACKEND / "modelos"
+    dir_modelos: Path = Path(os.getenv("VF_DIR_MODELOS", RAIZ_DATOS / "modelos"))
     dir_frontend: Path = RAIZ_PROYECTO / "frontend"
-    ruta_bd: Path = RAIZ_BACKEND / "eventos.db"
+    ruta_bd: Path = RAIZ_DATOS / "eventos.db"
 
     # --- Modelos MediaPipe (API Tasks) ---
     modelo_detector: str = "blaze_face_short_range.tflite"

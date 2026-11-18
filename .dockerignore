@@ -1,0 +1,10 @@
+.git
+.vercel
+.env*
+**/.venv
+**/__pycache__
+**/.pytest_cache
+backend/tests
+backend/eventos.db
+backend/modelos/*.tflite
+backend/modelos/*.task

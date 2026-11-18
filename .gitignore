@@ -5,3 +5,6 @@ __pycache__/
 backend/modelos/*.tflite
 backend/modelos/*.task
 backend/eventos.db
+
+.vercel
+.env*

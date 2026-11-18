@@ -1,0 +1,22 @@
+# Imagen para Vercel: FastAPI (API + WebSocket) + frontend estático en un solo servicio.
+FROM python:3.12-slim
+
+# MediaPipe necesita bibliotecas de sistema de OpenGL/EGL aunque no use GPU
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libegl1 libgles2 libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /srv
+ENV VF_DIR_MODELOS=/srv/backend/modelos
+COPY backend/requirements.txt backend/requirements.txt
+RUN pip install --no-cache-dir -r backend/requirements.txt
+
+COPY backend backend
+COPY frontend frontend
+
+# Modelos dentro de la imagen: evita descargarlos en cada arranque en frío
+RUN cd backend && python descargar_modelos.py
+
+ENV PORT=80
+WORKDIR /srv/backend
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]

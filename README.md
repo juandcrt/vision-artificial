@@ -160,20 +160,22 @@ pytest -q
 16 pruebas cubren reglas de validación, prueba de vida, métricas de calidad, endpoints REST y el flujo
 WebSocket completo (con un motor simulado, sin necesidad de cámara ni modelos).
 
-## 6.1 Publicación
+## 6.1 Publicación en Vercel
 
-El frontend estático se publica en Vercel y la API Python se ejecuta como servicio web persistente en Render,
-porque el flujo de cámara depende de WebSocket y no funciona como una función serverless de Vercel.
+Toda la aplicación (API, WebSocket y frontend) se publica como **un solo proyecto de Vercel** usando una imagen
+de contenedor (`Dockerfile.vercel`, preset `container` en `vercel.json`). El contenedor instala las bibliotecas
+de sistema que MediaPipe necesita (EGL/OpenGL) y descarga los modelos durante la construcción.
 
-1. Cree en Render un servicio nuevo desde este repositorio y use el Blueprint de `render.yaml`. Espere a que
-   `/api/salud` responda y copie la URL HTTPS del servicio.
-2. Importe el mismo repositorio en Vercel. La configuración de `vercel.json` construye la carpeta `frontend/`.
-   Defina la variable de entorno `VF_API_URL` con la URL HTTPS de Render (por ejemplo,
-   `https://vision-artificial-api.onrender.com`) y vuelva a desplegar.
-3. Abra la URL de Vercel, permita el acceso a la cámara y verifique la conexión con el servidor.
+```bash
+vercel deploy          # vista previa
+vercel deploy --prod   # producción
+```
 
-El plan gratuito de Render puede suspender el backend cuando no recibe tráfico, por lo que la primera conexión
-puede tardar. La bitácora SQLite en ese plan no es almacenamiento persistente.
+El frontend se conecta al mismo dominio (`frontend/config.js` deja `VF_API_URL` vacío). Si el servidor está en
+otro lugar, se puede cambiar en el panel **Conexión al servidor** de la interfaz.
+
+Limitaciones en Vercel: la bitácora SQLite vive en `/tmp` y se pierde cuando la instancia se recicla, y las
+conexiones WebSocket se cierran al llegar a la duración máxima de la función (el navegador se reconecta solo).
 
 ## 7. Estructura
 

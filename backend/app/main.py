@@ -11,12 +11,15 @@ Endpoints:
 """
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import json
 import logging
 import time
 import uuid
 from contextlib import asynccontextmanager
 from dataclasses import asdict
+from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,10 +33,24 @@ from .vision.validacion import OBSERVADO, VALIDADO, EstadoSesion, evaluar
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
 log = logging.getLogger("api")
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 MODOS = ("deteccion", "acceso")
 ESTADOS_A_REGISTRAR = (VALIDADO, OBSERVADO)
 SEGUNDOS_ENTRE_EVENTOS = 5.0
+
+
+def _huella_codigo(cfg: Config) -> str:
+    """Identificador del despliegue: cambia cuando cambia el código del backend o del frontend.
+    El navegador lo compara para avisar que el sistema se actualizó."""
+    h = hashlib.sha256()
+    for raiz in (Path(__file__).resolve().parent, cfg.dir_frontend):
+        if not raiz.exists():
+            continue
+        for ruta in sorted(raiz.rglob("*")):
+            if ruta.is_file() and "__pycache__" not in ruta.parts:
+                h.update(str(ruta.relative_to(raiz)).encode())
+                h.update(ruta.read_bytes())
+    return h.hexdigest()[:12]
 
 
 def _cargar_motor(cfg: Config):
@@ -45,18 +62,27 @@ def _cargar_motor(cfg: Config):
 
 
 def crear_app(motor=None, registro: RegistroEventos | None = None, cfg: Config = CONFIG,
-              servir_frontend: bool = True) -> FastAPI:
+              servir_frontend: bool = True, cargar_motor: bool = True) -> FastAPI:
     """Fábrica de la aplicación (permite inyectar un motor simulado en las pruebas)."""
+    candado_motor = asyncio.Lock()
+
+    async def obtener_motor():
+        """Carga el motor una sola vez. También se llama bajo demanda porque algunos
+        entornos serverless (Vercel) pueden no ejecutar el evento de arranque."""
+        if app.state.motor is None and cargar_motor:
+            async with candado_motor:
+                if app.state.motor is None:
+                    try:
+                        app.state.motor = await run_in_threadpool(_cargar_motor, cfg)
+                        app.state.error_motor = None
+                    except Exception as exc:  # el servidor sigue funcionando e informa el error
+                        log.exception("No se pudo iniciar el motor de visión")
+                        app.state.error_motor = str(exc)
+        return app.state.motor
 
     @asynccontextmanager
     async def ciclo_vida(app: FastAPI):
-        app.state.error_motor = None
-        if app.state.motor is None:
-            try:
-                app.state.motor = await run_in_threadpool(_cargar_motor, cfg)
-            except Exception as exc:  # el servidor arranca igual e informa el error
-                log.exception("No se pudo iniciar el motor de visión")
-                app.state.error_motor = str(exc)
+        await obtener_motor()
         yield
         if app.state.motor is not None and hasattr(app.state.motor, "cerrar"):
             app.state.motor.cerrar()
@@ -67,6 +93,7 @@ def crear_app(motor=None, registro: RegistroEventos | None = None, cfg: Config =
     app.state.error_motor = None
     app.state.registro = registro or RegistroEventos(cfg.ruta_bd)
     app.state.inicio = time.time()
+    app.state.despliegue = _huella_codigo(cfg)
     app.add_middleware(CORSMiddleware, allow_origins=list(cfg.origenes_cors),
                        allow_methods=["*"], allow_headers=["*"])
 
@@ -78,6 +105,7 @@ def crear_app(motor=None, registro: RegistroEventos | None = None, cfg: Config =
             "motor_listo": app.state.motor is not None,
             "error_motor": app.state.error_motor,
             "version": VERSION,
+            "despliegue": app.state.despliegue,
             "activo_desde_s": round(time.time() - app.state.inicio, 1),
         }
 
@@ -95,7 +123,7 @@ def crear_app(motor=None, registro: RegistroEventos | None = None, cfg: Config =
         malla: bool = Query(False, description="Incluir los 478 puntos faciales"),
         modo: str = Query("deteccion", pattern="^(deteccion|acceso)$"),
     ):
-        motor = app.state.motor
+        motor = await obtener_motor()
         if motor is None:
             raise HTTPException(503, f"Motor de visión no disponible: {app.state.error_motor}")
         datos = await imagen.read()
@@ -131,8 +159,9 @@ def crear_app(motor=None, registro: RegistroEventos | None = None, cfg: Config =
         estado = EstadoSesion()
         opciones = {"umbral": cfg.umbral_deteccion, "malla": False, "modo": "acceso"}
         ultimo_evento: dict[str, float] = {}
+        motor_listo = await obtener_motor() is not None
         await ws.send_json({"tipo": "bienvenida", "sesion": sesion_id,
-                            "motor_listo": app.state.motor is not None,
+                            "motor_listo": motor_listo,
                             "error_motor": app.state.error_motor})
         log.info("Cliente conectado (sesión %s)", sesion_id)
         try:

@@ -154,7 +154,8 @@ def test_websocket_flujo_completo(cliente):
 
 
 def test_motor_no_disponible(tmp_path):
-    app = crear_app(motor=None, registro=RegistroEventos(tmp_path / "e.db"), servir_frontend=False)
+    app = crear_app(motor=None, registro=RegistroEventos(tmp_path / "e.db"), servir_frontend=False,
+                    cargar_motor=False)
     app.state.motor = None
     c = TestClient(app)  # sin "with": no se ejecuta el arranque, el motor queda en None
     r = c.post("/api/detectar", files={"imagen": ("f.jpg", _jpeg(), "image/jpeg")})

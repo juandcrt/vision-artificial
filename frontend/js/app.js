@@ -21,6 +21,7 @@ const estado = {
   ultimoResultado: null,
   marcasFps: [],
   reintentos: 0,
+  despliegue: null,
 };
 
 const ESTADOS = {
@@ -372,10 +373,35 @@ async function cargarEventos() {
   }
 }
 
+// ------------------------------------------------------------------ aviso de actualización
+function mostrarBanner(texto, pendiente) {
+  $("bannerTexto").textContent = texto;
+  $("bannerActualizacion").classList.toggle("pendiente", pendiente);
+  $("btnRecargar").hidden = !pendiente;
+  $("bannerActualizacion").hidden = false;
+}
+
+function revisarDespliegue(s) {
+  if (!s.despliegue) return;
+  if (!estado.despliegue) {
+    // Primera consulta: si la última versión vista era otra, el sistema se actualizó
+    estado.despliegue = s.despliegue;
+    let anterior = null;
+    try { anterior = localStorage.getItem("vf_despliegue"); localStorage.setItem("vf_despliegue", s.despliegue); } catch {}
+    if (anterior !== s.despliegue) {
+      mostrarBanner(`El sistema se actualizó a la versión ${s.version}.`, false);
+    }
+  } else if (s.despliegue !== estado.despliegue) {
+    // La página quedó abierta mientras se publicaba una versión nueva
+    mostrarBanner("Hay una actualización del sistema disponible. Recargue para usar la versión nueva.", true);
+  }
+}
+
 async function verificarSalud() {
   try {
     const s = await fetch(apiUrl("/api/salud")).then((r) => r.json());
     chip("chipMotor", s.motor_listo ? "ok" : "error", s.motor_listo ? "listo" : "no disponible");
+    revisarDespliegue(s);
   } catch {
     chip("chipMotor", "error", "sin respuesta");
   }
@@ -452,6 +478,9 @@ function enlazar() {
   window.addEventListener("resize", () => estado.ultimoResultado && estado.corriendo && dibujar(estado.ultimoResultado));
   setInterval(() => ($("hudReloj").textContent = new Date().toLocaleTimeString("es-PE")), 1000);
   setInterval(cargarEventos, 10000);
+  setInterval(verificarSalud, 60000);
+  $("btnRecargar").onclick = () => location.reload();
+  $("btnCerrarBanner").onclick = () => ($("bannerActualizacion").hidden = true);
 }
 
 enlazar();

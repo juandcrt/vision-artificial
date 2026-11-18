@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Visión Facial IA · Detección en tiempo real</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 10V6a2 2 0 0 1 2-2h4M22 4h4a2 2 0 0 1 2 2v4M28 22v4a2 2 0 0 1-2 2h-4M10 28H6a2 2 0 0 1-2-2v-4' fill='none' stroke='%2322d3ee' stroke-width='2.5'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/estilos.css" />
+</head>
+<body>
+  <header class="cabecera">
+    <div class="marca">
+      <svg viewBox="0 0 32 32" class="logo" aria-hidden="true">
+        <path d="M4 10V6a2 2 0 0 1 2-2h4M22 4h4a2 2 0 0 1 2 2v4M28 22v4a2 2 0 0 1-2 2h-4M10 28H6a2 2 0 0 1-2-2v-4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+        <circle cx="12" cy="14" r="1.6" fill="currentColor"/><circle cx="20" cy="14" r="1.6" fill="currentColor"/>
+        <path d="M11.5 20.5c2.5 2 6.5 2 9 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <h1>Visión Facial IA</h1>
+        <p>Detección facial en tiempo real · MediaPipe + OpenCV</p>
+      </div>
+    </div>
+    <div class="chips">
+      <span class="chip" id="chipServidor"><i></i>Servidor: <b>desconectado</b></span>
+      <span class="chip" id="chipMotor"><i></i>Motor IA: <b>—</b></span>
+      <span class="chip chip-neutro" id="chipSesion">Sesión: <b>—</b></span>
+    </div>
+  </header>
+
+  <main class="rejilla">
+    <!-- ================= ESCENARIO DE VIDEO ================= -->
+    <section class="escenario tarjeta">
+      <div class="lienzo" id="lienzo">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="overlay"></canvas>
+
+        <div class="hud hud-sup">
+          <span class="rec" id="hudRec">● EN VIVO</span>
+          <span id="hudReloj">--:--:--</span>
+        </div>
+        <div class="hud hud-der">
+          <span><small>FPS</small> <b id="hudFps">0</b></span>
+          <span><small>Latencia</small> <b id="hudLat">0</b> ms</span>
+        </div>
+
+        <div class="reposo" id="reposo">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 10l4.55-2.28A1 1 0 0 1 21 8.62v6.76a1 1 0 0 1-1.45.9L15 14M5 18h8a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <p>La cámara está apagada</p>
+          <button class="btn btn-primario" id="btnIniciarReposo">Iniciar cámara</button>
+        </div>
+      </div>
+
+      <div class="banda" id="banda" data-estado="SIN_ROSTRO">
+        <div class="banda-estado">
+          <span class="punto"></span>
+          <strong id="bandaTitulo">En espera</strong>
+        </div>
+        <span id="bandaMensaje">Inicie la cámara para comenzar el análisis.</span>
+      </div>
+    </section>
+
+    <!-- ================= PANEL LATERAL ================= -->
+    <aside class="lateral">
+      <section class="tarjeta">
+        <h2>Control del sistema</h2>
+        <div class="fila-botones">
+          <button class="btn btn-primario" id="btnCamara">Iniciar cámara</button>
+          <button class="btn" id="btnCaptura" disabled title="Descargar captura con detecciones">Capturar</button>
+        </div>
+
+        <label class="campo">
+          <span>Cámara</span>
+          <select id="selCamara"><option value="">Predeterminada</option></select>
+        </label>
+
+        <div class="campo">
+          <span>Modo de operación</span>
+          <div class="segmentado" role="radiogroup">
+            <button data-modo="deteccion" role="radio">Detección</button>
+            <button data-modo="acceso" role="radio" class="activo">Control de acceso</button>
+          </div>
+        </div>
+
+        <label class="campo">
+          <span>Umbral de confianza <output id="outUmbral">0.50</output></span>
+          <input type="range" id="rngUmbral" min="0.3" max="0.95" step="0.05" value="0.5" />
+        </label>
+        <label class="campo">
+          <span>FPS máximos de envío <output id="outFps">15</output></span>
+          <input type="range" id="rngFps" min="2" max="30" step="1" value="15" />
+        </label>
+        <label class="campo">
+          <span>Resolución de análisis</span>
+          <select id="selResolucion">
+            <option value="320">320 px (rápido)</option>
+            <option value="480" selected>480 px (equilibrado)</option>
+            <option value="640">640 px (preciso)</option>
+          </select>
+        </label>
+
+        <div class="interruptores">
+          <label><input type="checkbox" id="chkCajas" checked /><span>Cuadros</span></label>
+          <label><input type="checkbox" id="chkPuntos" checked /><span>Puntos clave</span></label>
+          <label><input type="checkbox" id="chkMalla" /><span>Malla facial (478)</span></label>
+          <label><input type="checkbox" id="chkEspejo" checked /><span>Modo espejo</span></label>
+        </div>
+        <button class="btn btn-bloque" id="btnReiniciar">Reiniciar verificación</button>
+      </section>
+
+      <section class="tarjeta">
+        <h2>Métricas</h2>
+        <div class="metricas">
+          <div><small>Rostros</small><b id="mRostros">0</b></div>
+          <div><small>Confianza</small><b id="mConf">—</b></div>
+          <div><small>Inferencia</small><b id="mInf">—</b></div>
+          <div><small>Parpadeos</small><b id="mParp">0</b></div>
+        </div>
+      </section>
+
+      <section class="tarjeta">
+        <h2>Validación</h2>
+        <ul class="checklist" id="checklist">
+          <li class="vacio">Sin datos todavía.</li>
+        </ul>
+      </section>
+
+      <section class="tarjeta">
+        <h2>Rostro principal</h2>
+        <div class="barras" id="barras">
+          <div class="barra" data-k="yaw"><span>Giro (yaw)</span><div><i></i></div><b>—</b></div>
+          <div class="barra" data-k="pitch"><span>Inclinación (pitch)</span><div><i></i></div><b>—</b></div>
+          <div class="barra" data-k="roll"><span>Rotación (roll)</span><div><i></i></div><b>—</b></div>
+          <div class="barra" data-k="brillo"><span>Brillo</span><div><i></i></div><b>—</b></div>
+          <div class="barra" data-k="nitidez"><span>Nitidez</span><div><i></i></div><b>—</b></div>
+          <div class="barra" data-k="sonrisa"><span>Sonrisa</span><div><i></i></div><b>—</b></div>
+        </div>
+      </section>
+    </aside>
+
+    <!-- ================= BITÁCORA ================= -->
+    <section class="tarjeta bitacora">
+      <div class="bitacora-cab">
+        <h2>Registro de eventos</h2>
+        <div class="resumen" id="resumen"></div>
+        <div class="fila-botones">
+          <button class="btn btn-chico" id="btnActualizar">Actualizar</button>
+          <button class="btn btn-chico btn-peligro" id="btnLimpiar">Limpiar</button>
+        </div>
+      </div>
+      <div class="tabla-envoltura">
+        <table>
+          <thead><tr><th>#</th><th>Fecha y hora</th><th>Sesión</th><th>Modo</th><th>Estado</th><th>Rostros</th><th>Confianza</th><th>Observaciones</th></tr></thead>
+          <tbody id="tablaEventos"><tr><td colspan="8" class="vacio">Sin eventos registrados.</td></tr></tbody>
+        </table>
+      </div>
+      <details class="avanzado">
+        <summary>Conexión al servidor</summary>
+        <div class="fila-servidor">
+          <input type="text" id="txtServidor" placeholder="http://localhost:8000" />
+          <button class="btn btn-chico" id="btnServidor">Conectar</button>
+        </div>
+        <p class="nota">Se guardan solo metadatos (estado, confianza, hora). Las imágenes se procesan en memoria y no se almacenan.</p>
+      </details>
+    </section>
+  </main>
+
+  <div class="aviso" id="aviso" role="status"></div>
+  <script src="config.js"></script>
+  <script src="js/app.js" type="module"></script>
+</body>
+</html>

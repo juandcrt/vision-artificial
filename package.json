@@ -1,0 +1,7 @@
+{
+  "name": "vision-artificial-frontend",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build-frontend.js"
+  }
+}

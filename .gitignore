@@ -1,0 +1,7 @@
+.venv/
+dist/
+__pycache__/
+.pytest_cache/
+backend/modelos/*.tflite
+backend/modelos/*.task
+backend/eventos.db

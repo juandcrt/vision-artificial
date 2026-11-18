@@ -246,7 +246,8 @@ function ajustarOverlay() {
 
 function dibujar(res, destino = ctx, dims = null) {
   const { w, h } = dims || ajustarOverlay();
-  const espejo = estado.opciones.espejo && !dims;
+  // La captura respeta el modo espejo para que el PNG se vea igual que la pantalla
+  const espejo = estado.opciones.espejo;
   // Área real donde se muestra el fotograma (object-fit: contain deja bandas a los lados o arriba)
   const vw = video.videoWidth || w, vh = video.videoHeight || h;
   const escala = Math.min(w / vw, h / vh);
@@ -254,7 +255,7 @@ function dibujar(res, destino = ctx, dims = null) {
   const ox = (w - dw) / 2, oy = (h - dh) / 2;
   const X = (x) => ox + (espejo ? 1 - x : x) * dw;
   const Y = (y) => oy + y * dh;
-  destino.clearRect(0, 0, w, h);
+  if (!dims) destino.clearRect(0, 0, w, h); // en la captura el fotograma ya está pintado debajo
   const colorPrincipal = ESTADOS[res.validacion.estado]?.color || COLOR_SECUNDARIO;
 
   res.rostros.forEach((r, i) => {
@@ -427,7 +428,10 @@ function capturar() {
   c.width = video.videoWidth;
   c.height = video.videoHeight;
   const g = c.getContext("2d");
+  g.save();
+  if (estado.opciones.espejo) { g.translate(c.width, 0); g.scale(-1, 1); }
   g.drawImage(video, 0, 0);
+  g.restore();
   dibujar(estado.ultimoResultado, g, { w: c.width, h: c.height });
   g.font = "600 16px system-ui"; g.fillStyle = "#fff";
   g.fillText(`${new Date().toLocaleString("es-PE")} · ${estado.ultimoResultado.validacion.estado}`, 12, c.height - 14);

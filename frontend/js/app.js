@@ -239,8 +239,13 @@ function ajustarOverlay() {
 function dibujar(res, destino = ctx, dims = null) {
   const { w, h } = dims || ajustarOverlay();
   const espejo = estado.opciones.espejo && !dims;
-  const X = (x) => (espejo ? 1 - x : x) * w;
-  const Y = (y) => y * h;
+  // Área real donde se muestra el fotograma (object-fit: contain deja bandas a los lados o arriba)
+  const vw = video.videoWidth || w, vh = video.videoHeight || h;
+  const escala = Math.min(w / vw, h / vh);
+  const dw = vw * escala, dh = vh * escala;
+  const ox = (w - dw) / 2, oy = (h - dh) / 2;
+  const X = (x) => ox + (espejo ? 1 - x : x) * dw;
+  const Y = (y) => oy + y * dh;
   destino.clearRect(0, 0, w, h);
   const colorPrincipal = ESTADOS[res.validacion.estado]?.color || COLOR_SECUNDARIO;
 
@@ -248,7 +253,7 @@ function dibujar(res, destino = ctx, dims = null) {
     const color = i === 0 ? colorPrincipal : COLOR_SECUNDARIO;
     const c = r.caja;
     const x0 = espejo ? X(c.x + c.ancho) : X(c.x);
-    const y0 = Y(c.y), bw = c.ancho * w, bh = c.alto * h;
+    const y0 = Y(c.y), bw = c.ancho * dw, bh = c.alto * dh;
 
     if (r.malla && estado.opciones.malla) {
       destino.fillStyle = "rgba(34, 211, 238, 0.55)";

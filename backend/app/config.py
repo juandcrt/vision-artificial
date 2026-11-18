@@ -64,6 +64,7 @@ class Config:
     frames_estables: int = 5           # frames válidos consecutivos para aprobar
 
     # --- Servidor ---
+    zona_horaria: str = field(default_factory=lambda: os.getenv("VF_ZONA_HORARIA", "America/Lima"))
     origenes_cors: tuple[str, ...] = ("*",)
 
 

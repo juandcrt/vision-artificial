@@ -6,11 +6,13 @@ import sqlite3
 import threading
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 
 class RegistroEventos:
-    def __init__(self, ruta: Path | str):
+    def __init__(self, ruta: Path | str, zona_horaria: str = "America/Lima"):
         self._lock = threading.Lock()
+        self._zona = ZoneInfo(zona_horaria)  # el servidor (Vercel) corre en UTC
         Path(ruta).parent.mkdir(parents=True, exist_ok=True)
         self._con = sqlite3.connect(str(ruta), check_same_thread=False)
         self._con.execute(
@@ -29,7 +31,7 @@ class RegistroEventos:
 
     def registrar(self, sesion: str, modo: str, estado: str, num_rostros: int,
                   confianza: float | None, motivos: list[str]) -> dict:
-        fecha = datetime.now().isoformat(timespec="seconds")
+        fecha = datetime.now(self._zona).replace(tzinfo=None).isoformat(timespec="seconds")
         with self._lock:
             cur = self._con.execute(
                 "INSERT INTO eventos (fecha, sesion, modo, estado, num_rostros, confianza, motivos) "
@@ -58,7 +60,7 @@ class RegistroEventos:
         with self._lock:
             total = self._con.execute("SELECT COUNT(*) FROM eventos").fetchone()[0]
             por_estado = dict(self._con.execute("SELECT estado, COUNT(*) FROM eventos GROUP BY estado").fetchall())
-            hoy = datetime.now().date().isoformat()
+            hoy = datetime.now(self._zona).date().isoformat()
             validados_hoy = self._con.execute(
                 "SELECT COUNT(*) FROM eventos WHERE estado = 'VALIDADO' AND fecha >= ?", (hoy,)
             ).fetchone()[0]

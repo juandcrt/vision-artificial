@@ -13,8 +13,7 @@ const estado = {
   ws: null,
   stream: null,
   corriendo: false,
-  esperando: false,
-  tEnvio: 0,
+  enVuelo: [], // instantes de envío de los fotogramas sin respuesta todavía
   ultimoEnvio: 0,
   modo: "acceso",
   opciones: { umbral: 0.5, fpsMax: 15, ancho: 480, cajas: true, puntos: true, malla: false, espejo: true },
@@ -73,7 +72,7 @@ function conectar() {
   };
   ws.onclose = () => {
     chip("chipServidor", "error", "desconectado");
-    estado.esperando = false;
+    liberarEnvios();
     if (estado.ws !== ws) return; // se reemplazó por una conexión nueva
     const espera = Math.min(1000 * 2 ** estado.reintentos++, 10000);
     setTimeout(() => estado.ws === ws && conectar(), espera);
@@ -94,7 +93,7 @@ function conectar() {
         aviso("Verificación reiniciada.");
         break;
       case "error":
-        estado.esperando = false;
+        estado.enVuelo.shift(); // ese fotograma no tendrá resultado
         aviso(msg.mensaje, "error");
         break;
     }
@@ -142,10 +141,10 @@ async function iniciarCamara() {
   }
   video.srcObject = estado.stream;
   await video.play();
-  $("lienzo").style.aspectRatio = `${video.videoWidth} / ${video.videoHeight}`;
+  $("lienzo").style.setProperty("--proporcion", `${video.videoWidth} / ${video.videoHeight}`);
   $("lienzo").classList.add("activo");
   estado.corriendo = true;
-  estado.esperando = false;
+  liberarEnvios();
   actualizarBotonCamara();
   $("btnCaptura").disabled = false;
   listarCamaras();
@@ -172,15 +171,23 @@ function actualizarBotonCamara() {
 }
 
 // ------------------------------------------------------------------ bucle de envío
+// Fotogramas que pueden estar viajando a la vez: así la latencia de red no limita los FPS
+// (con uno solo, a 150-250 ms de ida y vuelta el máximo serían 4-6 FPS). El servidor responde en orden.
+const MAX_EN_VUELO = 3;
+
+function liberarEnvios() {
+  estado.enVuelo = [];
+}
+
 function bucle() {
   if (!estado.corriendo) return;
   const ahora = performance.now();
-  // Vigilante: si el servidor no responde en 3 s, se libera el turno
-  if (estado.esperando && ahora - estado.tEnvio > 3000) estado.esperando = false;
+  // Vigilante: si el servidor no responde en 3 s, se liberan los turnos
+  if (estado.enVuelo.length && ahora - estado.enVuelo[0] > 3000) liberarEnvios();
 
   const intervalo = 1000 / estado.opciones.fpsMax;
-  if (!estado.esperando && estado.ws?.readyState === WebSocket.OPEN && ahora - estado.ultimoEnvio >= intervalo
-      && video.readyState >= 2) {
+  if (estado.enVuelo.length < MAX_EN_VUELO && estado.ws?.readyState === WebSocket.OPEN
+      && ahora - estado.ultimoEnvio >= intervalo && video.readyState >= 2) {
     enviarFotograma();
   }
   requestAnimationFrame(bucle);
@@ -192,20 +199,21 @@ function enviarFotograma() {
   capCanvas.width = w;
   capCanvas.height = h;
   capCtx.drawImage(video, 0, 0, w, h);
-  estado.esperando = true;
-  estado.ultimoEnvio = estado.tEnvio = performance.now();
+  const t = performance.now();
+  estado.ultimoEnvio = t;
+  estado.enVuelo.push(t);
   capCanvas.toBlob((blob) => {
     if (blob && estado.ws?.readyState === WebSocket.OPEN) estado.ws.send(blob);
-    else estado.esperando = false;
+    else estado.enVuelo = estado.enVuelo.filter((x) => x !== t);
   }, "image/jpeg", 0.75);
 }
 
 // ------------------------------------------------------------------ resultados
 function alRecibirResultado(res) {
   const ahora = performance.now();
-  estado.esperando = false;
+  const tEnvio = estado.enVuelo.shift() ?? ahora;
   estado.ultimoResultado = res;
-  const latencia = Math.round(ahora - estado.tEnvio);
+  const latencia = Math.round(ahora - tEnvio);
 
   estado.marcasFps.push(ahora);
   while (estado.marcasFps.length && ahora - estado.marcasFps[0] > 1000) estado.marcasFps.shift();

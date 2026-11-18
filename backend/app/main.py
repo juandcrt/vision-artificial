@@ -33,7 +33,7 @@ from .vision.validacion import OBSERVADO, VALIDADO, EstadoSesion, evaluar
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
 log = logging.getLogger("api")
 
-VERSION = "1.2.0"
+VERSION = "1.3.0"
 MODOS = ("deteccion", "acceso")
 ESTADOS_A_REGISTRAR = (VALIDADO, OBSERVADO)
 SEGUNDOS_ENTRE_EVENTOS = 5.0
@@ -91,7 +91,7 @@ def crear_app(motor=None, registro: RegistroEventos | None = None, cfg: Config =
                   description="Detección facial en tiempo real con MediaPipe y OpenCV")
     app.state.motor = motor
     app.state.error_motor = None
-    app.state.registro = registro or RegistroEventos(cfg.ruta_bd)
+    app.state.registro = registro or RegistroEventos(cfg.ruta_bd, cfg.zona_horaria)
     app.state.inicio = time.time()
     app.state.despliegue = _huella_codigo(cfg)
     app.add_middleware(CORSMiddleware, allow_origins=list(cfg.origenes_cors),

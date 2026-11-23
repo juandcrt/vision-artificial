@@ -209,3 +209,11 @@ def test_motor_no_disponible(tmp_path):
     c = TestClient(app)  # sin "with": no se ejecuta el arranque, el motor queda en None
     r = c.post("/api/detectar", files={"imagen": ("f.jpg", _jpeg(), "image/jpeg")})
     assert r.status_code == 503
+
+
+def test_caja_con_margen_no_sale_de_la_imagen():
+    from app.vision.motor import _con_margen
+    c = _con_margen({"x": 0.4, "y": 0.4, "ancho": 0.2, "alto": 0.2}, 0.1, 0.1)
+    assert c == {"x": 0.38, "y": 0.38, "ancho": 0.24, "alto": 0.24}
+    borde = _con_margen({"x": 0.0, "y": 0.9, "ancho": 0.2, "alto": 0.1}, 0.1, 0.5)
+    assert borde["x"] == 0.0 and borde["y"] + borde["alto"] <= 1.0

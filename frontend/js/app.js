@@ -21,6 +21,7 @@ const estado = {
   marcasFps: [],
   reintentos: 0,
   despliegue: null,
+  ultimoConRostros: null, // { res, t } para no borrar las cajas por un fotograma perdido
 };
 
 const ESTADOS = {
@@ -177,6 +178,8 @@ function actualizarBotonCamara() {
 // Fotogramas que pueden estar viajando a la vez: así la latencia de red no limita los FPS
 // (con uno solo, a 150-250 ms de ida y vuelta el máximo serían 4-6 FPS). El servidor responde en orden.
 const MAX_EN_VUELO = 3;
+// Si un fotograma suelto llega sin rostro, se mantienen las últimas cajas este tiempo (evita parpadeos)
+const RETENER_CAJAS_MS = 400;
 
 function liberarEnvios() {
   estado.enVuelo = [];
@@ -228,7 +231,9 @@ function alRecibirResultado(res) {
   $("mInf").textContent = `${res.tiempo_inferencia_ms} ms`;
   $("mParp").textContent = res.validacion.parpadeos;
 
-  if (estado.corriendo) dibujar(res);
+  if (res.rostros.length) estado.ultimoConRostros = { res, t: ahora };
+  const reciente = estado.ultimoConRostros && ahora - estado.ultimoConRostros.t < RETENER_CAJAS_MS;
+  if (estado.corriendo) dibujar(!res.rostros.length && reciente ? estado.ultimoConRostros.res : res);
   pintarBanda(res.validacion);
   pintarChecklist(res.validacion.verificaciones);
   pintarBarras(res.rostros[0]);

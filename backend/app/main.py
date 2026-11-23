@@ -33,7 +33,7 @@ from .vision.validacion import OBSERVADO, VALIDADO, EstadoSesion, evaluar
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
 log = logging.getLogger("api")
 
-VERSION = "1.5.1"
+VERSION = "1.6.0"
 MODOS = ("deteccion", "acceso")
 ESTADOS_A_REGISTRAR = (VALIDADO, OBSERVADO)
 SEGUNDOS_ENTRE_EVENTOS = 5.0

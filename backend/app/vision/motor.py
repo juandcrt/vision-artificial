@@ -20,6 +20,15 @@ NOMBRES_PUNTOS = ["ojo_derecho", "ojo_izquierdo", "nariz", "boca", "oreja_derech
 BLENDSHAPES_INTERES = ("eyeBlinkLeft", "eyeBlinkRight", "jawOpen", "mouthSmileLeft", "mouthSmileRight")
 
 
+def _con_margen(caja: dict, margen_x: float, margen_y: float) -> dict:
+    """Amplía una caja normalizada (fracción de su tamaño por lado) sin salirse de la imagen."""
+    x0 = max(caja["x"] - caja["ancho"] * margen_x, 0.0)
+    y0 = max(caja["y"] - caja["alto"] * margen_y, 0.0)
+    x1 = min(caja["x"] + caja["ancho"] * (1 + margen_x), 1.0)
+    y1 = min(caja["y"] + caja["alto"] * (1 + margen_y), 1.0)
+    return {"x": round(x0, 4), "y": round(y0, 4), "ancho": round(x1 - x0, 4), "alto": round(y1 - y0, 4)}
+
+
 class MotorVision:
     """Envuelve FaceDetector (cajas + 6 puntos) y FaceLandmarker (478 puntos, gestos y pose)."""
 
@@ -107,7 +116,7 @@ class MotorVision:
         rostros = []
         for det in res_det.detections or []:
             score = float(det.categories[0].score) if det.categories else 0.0
-            if score < umbral:
+            if score < umbral - self.cfg.margen_con_malla:
                 continue
             bb = det.bounding_box
             caja = {
@@ -116,6 +125,16 @@ class MotorVision:
                 "ancho": round(bb.width / w, 4),
                 "alto": round(bb.height / h, 4),
             }
+            # Asociar la malla con mayor solapamiento
+            mejor, mejor_iou = None, 0.25
+            for m in mallas:
+                if m["usada"]:
+                    continue
+                v = iou(caja, m["caja"])
+                if v > mejor_iou:
+                    mejor, mejor_iou = m, v
+            if score < umbral and mejor is None:
+                continue  # confianza baja y sin malla que lo confirme
             rostro = {
                 "id": len(rostros),
                 "confianza": round(score, 3),
@@ -131,16 +150,12 @@ class MotorVision:
                 "malla": None,
             }
             rostro["mascarilla"] = detectar_mascarilla(img_bgr, rostro["puntos_clave"], self.cfg)
-            # Asociar la malla con mayor solapamiento
-            mejor, mejor_iou = None, 0.25
-            for m in mallas:
-                if m["usada"]:
-                    continue
-                v = iou(caja, m["caja"])
-                if v > mejor_iou:
-                    mejor, mejor_iou = m, v
             if mejor is not None:
                 mejor["usada"] = True
+                # La malla cubre la cara entera (frente a barbilla); la caja del detector deja fuera
+                # la frente y con mascarilla puede quedar desplazada. Calidad y distancia siguen
+                # midiéndose con la caja del detector, para la que están calibrados los umbrales.
+                rostro["caja"] = _con_margen(mejor["caja"], 0.06, 0.08)
                 rostro["pose"] = mejor["pose"]
                 rostro["gestos"] = mejor["gestos"]
                 rostro["num_puntos_malla"] = len(mejor["puntos"])

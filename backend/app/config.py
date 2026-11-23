@@ -50,6 +50,9 @@ class Config:
     max_rostros: int = field(default_factory=lambda: _env_int("VF_MAX_ROSTROS", 5))
     umbral_deteccion: float = field(default_factory=lambda: _env_float("VF_UMBRAL", 0.5))
     ancho_max_entrada: int = 960  # se redimensiona si llega una imagen más grande
+    # Si la malla facial confirma el rostro, se acepta con este margen por debajo del umbral
+    # (con mascarilla o lentes la confianza del detector baja aunque la cara sea clara)
+    margen_con_malla: float = 0.2
 
     # --- Validación (modo control de acceso) ---
     umbral_acceso: float = field(default_factory=lambda: _env_float("VF_UMBRAL_ACCESO", 0.75))

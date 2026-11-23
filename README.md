@@ -84,9 +84,11 @@ El resto de umbrales (brillo, nitidez, ángulos, ventana de vivacidad) está en 
 - **Umbral de confianza:** descarta detecciones débiles.
 - **FPS máximos / Resolución de análisis:** equilibran fluidez vs. precisión según la PC.
 - **Malla facial (478):** dibuja los puntos faciales de MediaPipe Face Landmarker.
-- **Mascarilla:** la etiqueta de cada rostro indica *Mascarilla detectada* o *Sin mascarilla*. Se compara el
-  tono de piel del entrecejo con el de la zona de boca y barbilla (OpenCV, espacio YCrCb). Es informativa:
-  no cambia las reglas de validación. Una mascarilla de color piel podría no detectarse.
+- **Mascarilla:** la etiqueta de cada rostro indica *Mascarilla detectada* o *Sin mascarilla*. Se mide cuánta
+  piel hay en la zona de boca y barbilla usando la "rojez" Cr−Cb (OpenCV, espacio YCrCb): la piel es rojiza
+  incluso con cámaras de colores apagados, mientras que las mascarillas celestes, blancas o negras no. El umbral
+  se ajusta al tono del entrecejo de cada persona. Es informativa: no cambia las reglas de validación.
+  Una mascarilla de color piel, rosada o roja podría no detectarse.
 - **Capturar:** descarga un PNG del fotograma con las detecciones dibujadas.
 - **Registro de eventos:** cambios de estado (Validado / Observado) con hora, sesión y motivo.
 

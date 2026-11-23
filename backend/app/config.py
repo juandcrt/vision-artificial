@@ -65,7 +65,9 @@ class Config:
     frames_estables: int = 5           # frames válidos consecutivos para aprobar
 
     # --- Mascarilla (solo informativa: no cambia la validación) ---
-    mascarilla_tolerancia_color: float = 18.0  # distancia máx. en (Cr, Cb) para contar un píxel como piel
+    mascarilla_fraccion_rojez: float = 0.5     # un píxel es piel si su Cr-Cb >= esta fracción del entrecejo...
+    mascarilla_rojez_min: float = 8.0          # ...pero nunca menos que esto (mascarillas: Cr-Cb <= 0)
+    mascarilla_rojez_max: float = 25.0         # ...ni más que esto (labios y sombras siguen contando)
     mascarilla_piel_min: float = 0.35          # con menos piel que esto en boca/barbilla -> mascarilla
 
     # --- Servidor ---

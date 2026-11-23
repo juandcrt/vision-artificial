@@ -108,6 +108,23 @@ def test_con_mascarilla(color):
     assert r["detectada"] is True and r["piel_inferior"] < 0.1
 
 
+@pytest.mark.parametrize("color", [(240, 240, 240), (25, 25, 25)])
+def test_mascarilla_con_camara_de_colores_apagados(color):
+    # Piel casi gris (Cr-Cb ~ 20, como una webcam con poca saturación): blanca/negra deben distinguirse
+    img = np.full((200, 200, 3), (60, 60, 60), np.uint8)
+    cv2.ellipse(img, (100, 100), (70, 90), 0, 0, 360, (128, 138, 155), -1)
+    assert detectar_mascarilla(img, PUNTOS_CARA)["detectada"] is False
+    cv2.rectangle(img, (40, 85), (160, 175), color, -1)
+    assert detectar_mascarilla(img, PUNTOS_CARA)["detectada"] is True
+
+
+def test_mascarilla_que_tapa_la_referencia():
+    # Mascarilla subida hasta los ojos: la muestra del entrecejo queda sobre la tela
+    img = cara_sintetica()
+    cv2.rectangle(img, (40, 62), (160, 175), (230, 200, 160), -1)
+    assert detectar_mascarilla(img, PUNTOS_CARA)["detectada"] is True
+
+
 def test_mascarilla_sin_puntos():
     assert detectar_mascarilla(cara_sintetica(), PUNTOS_CARA[:2]) is None
 

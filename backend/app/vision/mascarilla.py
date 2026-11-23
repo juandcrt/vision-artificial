@@ -1,9 +1,10 @@
 """Detección de mascarilla con OpenCV a partir de los puntos clave de BlazeFace.
 
-Idea: el entrecejo (entre los ojos) nunca queda cubierto por una mascarilla, así que
-sirve de muestra del tono de piel de esa persona con la iluminación del momento.
-Si la zona de boca y barbilla casi no tiene píxeles de ese mismo tono, está cubierta.
-Se compara solo el color (Cr, Cb de YCrCb), no el brillo, para tolerar sombras.
+Idea: la piel es rojiza (Cr > Cb en YCrCb) aun con poca luz o cámaras de colores apagados,
+mientras que las mascarillas celestes, blancas o negras no lo son. Si la zona de boca y
+barbilla casi no tiene píxeles rojizos, está cubierta. El entrecejo, que la mascarilla no
+suele tapar, sirve para ajustar el umbral al tono de cada persona. Solo se usa el color,
+no el brillo, para tolerar sombras.
 No necesita un modelo adicional y tarda menos de 1 ms por rostro.
 """
 from __future__ import annotations
@@ -44,9 +45,18 @@ def detectar_mascarilla(img_bgr: np.ndarray, puntos_clave: list[dict], cfg: Conf
     if referencia is None or inferior is None:
         return None
 
-    ref = cv2.cvtColor(referencia, cv2.COLOR_BGR2YCrCb).reshape(-1, 3)[:, 1:].astype(np.float32)
-    inf = cv2.cvtColor(inferior, cv2.COLOR_BGR2YCrCb).reshape(-1, 3)[:, 1:].astype(np.float32)
-    tono_piel = np.median(ref, axis=0)  # la mediana ignora la montura de lentes o sombras puntuales
-    distancia = np.linalg.norm(inf - tono_piel, axis=1)
-    piel = float((distancia <= cfg.mascarilla_tolerancia_color).mean())
+    # "Rojez" de cada píxel = Cr - Cb. La piel siempre tira a rojo (positivo) incluso con cámaras de
+    # colores apagados; las mascarillas celestes, blancas o negras quedan en cero o negativo.
+    rojez_ref = _rojez(referencia)
+    rojez_inf = _rojez(inferior)
+    # Umbral relativo a la piel de esta persona (la mediana ignora la montura de lentes), con un mínimo
+    # fijo: si la referencia quedó sobre la mascarilla, igual se exige un tono claramente rojizo.
+    umbral = float(np.clip(cfg.mascarilla_fraccion_rojez * np.median(rojez_ref),
+                           cfg.mascarilla_rojez_min, cfg.mascarilla_rojez_max))
+    piel = float((rojez_inf >= umbral).mean())
     return {"detectada": piel < cfg.mascarilla_piel_min, "piel_inferior": round(piel, 3)}
+
+
+def _rojez(parche_bgr: np.ndarray) -> np.ndarray:
+    ycrcb = cv2.cvtColor(parche_bgr, cv2.COLOR_BGR2YCrCb).reshape(-1, 3).astype(np.float32)
+    return ycrcb[:, 1] - ycrcb[:, 2]

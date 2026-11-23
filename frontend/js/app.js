@@ -22,6 +22,9 @@ const estado = {
   reintentos: 0,
   despliegue: null,
   ultimoConRostros: null, // { res, t } para no borrar las cajas por un fotograma perdido
+  objetivo: null, // último resultado a dibujar
+  mostrado: null, // lo que está en pantalla, deslizándose hacia el objetivo
+  tAnim: 0,
 };
 
 const ESTADOS = {
@@ -164,6 +167,7 @@ function detenerCamara() {
   $("lienzo").classList.remove("activo");
   $("btnCaptura").disabled = true;
   ctx.clearRect(0, 0, overlay.width, overlay.height);
+  estado.objetivo = estado.mostrado = null;
   pintarBanda({ estado: "SIN_ROSTRO", motivos: ["Cámara detenida."] });
   actualizarBotonCamara();
 }
@@ -187,6 +191,7 @@ function liberarEnvios() {
 
 function bucle() {
   if (!estado.corriendo) return;
+  animarDibujo();
   const ahora = performance.now();
   // Vigilante: si el servidor no responde en 3 s, se liberan los turnos
   if (estado.enVuelo.length && ahora - estado.enVuelo[0] > 3000) liberarEnvios();
@@ -233,7 +238,7 @@ function alRecibirResultado(res) {
 
   if (res.rostros.length) estado.ultimoConRostros = { res, t: ahora };
   const reciente = estado.ultimoConRostros && ahora - estado.ultimoConRostros.t < RETENER_CAJAS_MS;
-  if (estado.corriendo) dibujar(!res.rostros.length && reciente ? estado.ultimoConRostros.res : res);
+  estado.objetivo = !res.rostros.length && reciente ? estado.ultimoConRostros.res : res; // lo anima bucle()
   pintarBanda(res.validacion);
   pintarChecklist(res.validacion.verificaciones);
   pintarBarras(res.rostros[0]);
@@ -241,6 +246,40 @@ function alRecibirResultado(res) {
 }
 
 // ------------------------------------------------------------------ dibujo
+// Los resultados llegan ~12 veces por segundo; en vez de saltar de golpe, la caja y los puntos
+// se deslizan hacia la última posición en cada cuadro de pantalla (60 FPS), y el movimiento se ve fluido.
+const SUAVIZADO_MS = 70; // tiempo característico del deslizamiento (menor = más rápido, más brusco)
+
+function animarDibujo() {
+  const objetivo = estado.objetivo;
+  if (!objetivo) return;
+  const ahora = performance.now();
+  const dt = Math.min(ahora - (estado.tAnim || ahora), 100);
+  estado.tAnim = ahora;
+  const previo = estado.mostrado;
+  // Si cambió el número de rostros no hay con qué interpolar: se muestra el objetivo tal cual
+  if (!previo || previo.rostros.length !== objetivo.rostros.length) {
+    estado.mostrado = structuredClone(objetivo);
+  } else {
+    const a = 1 - Math.exp(-dt / SUAVIZADO_MS);
+    const mezclar = (de, a_) => de + (a_ - de) * a;
+    estado.mostrado = {
+      ...objetivo,
+      rostros: objetivo.rostros.map((r, i) => {
+        const p = previo.rostros[i];
+        const caja = {};
+        for (const k of ["x", "y", "ancho", "alto"]) caja[k] = mezclar(p.caja[k], r.caja[k]);
+        const puntos = r.puntos_clave.map((q, j) => {
+          const pq = p.puntos_clave.find((x) => x.nombre === q.nombre) || p.puntos_clave[j];
+          return pq ? { ...q, x: mezclar(pq.x, q.x), y: mezclar(pq.y, q.y) } : q;
+        });
+        return { ...r, caja, puntos_clave: puntos };
+      }),
+    };
+  }
+  dibujar(estado.mostrado);
+}
+
 function ajustarOverlay() {
   const dpr = window.devicePixelRatio || 1;
   const { clientWidth: w, clientHeight: h } = overlay;

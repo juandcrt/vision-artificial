@@ -53,6 +53,10 @@ class Config:
     # Si la malla facial confirma el rostro, se acepta con este margen por debajo del umbral
     # (con mascarilla o lentes la confianza del detector baja aunque la cara sea clara)
     margen_con_malla: float = 0.2
+    # Compensación de luz: si la cámara baja sola la exposición, se aclara la imagen (gamma)
+    # solo para detectar. Brillo e iluminación se siguen midiendo sobre la imagen original.
+    brillo_objetivo_deteccion: float = 115.0
+    gamma_min: float = 0.55
 
     # --- Validación (modo control de acceso) ---
     umbral_acceso: float = field(default_factory=lambda: _env_float("VF_UMBRAL_ACCESO", 0.75))

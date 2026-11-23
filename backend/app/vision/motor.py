@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import threading
 import time
 from pathlib import Path
@@ -18,6 +19,52 @@ log = logging.getLogger("vision.motor")
 # Nombres de los 6 puntos clave que entrega BlazeFace
 NOMBRES_PUNTOS = ["ojo_derecho", "ojo_izquierdo", "nariz", "boca", "oreja_derecha", "oreja_izquierda"]
 BLENDSHAPES_INTERES = ("eyeBlinkLeft", "eyeBlinkRight", "jawOpen", "mouthSmileLeft", "mouthSmileRight")
+# Los mismos 6 puntos tomados de la malla de 478 (centro del iris, punta de nariz, centro de
+# la boca, tragos). Son más precisos que los del detector, sobre todo con lentes o mascarilla.
+INDICES_MALLA = {"ojo_derecho": (468,), "ojo_izquierdo": (473,), "nariz": (1,), "boca": (13, 14),
+                 "oreja_derecha": (234,), "oreja_izquierda": (454,)}
+
+
+def compensar_luz(img_bgr: np.ndarray, objetivo: float, gamma_min: float) -> np.ndarray:
+    """Aclara una imagen oscura con corrección gamma para que su brillo medio se acerque al objetivo.
+
+    Las webcams bajan la exposición por su cuenta (p. ej. con una pared clara detrás) y la cara
+    queda tan oscura que el detector la pierde. La gamma aclara las sombras sin saturar las luces.
+    """
+    media = float(cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY).mean())
+    if media >= objetivo or media < 1:
+        return img_bgr
+    g = max(math.log(objetivo / 255) / math.log(media / 255), gamma_min)
+    tabla = (np.linspace(0, 1, 256) ** g * 255).astype(np.uint8)
+    return cv2.LUT(img_bgr, tabla)
+
+
+def _extraer_mallas(res_lmk) -> list[dict]:
+    """Mallas de FaceLandmarker con su caja, gestos y pose."""
+    mallas = []
+    for i, puntos in enumerate(res_lmk.face_landmarks or []):
+        xs = [p.x for p in puntos]
+        ys = [p.y for p in puntos]
+        caja = {"x": min(xs), "y": min(ys), "ancho": max(xs) - min(xs), "alto": max(ys) - min(ys)}
+        gestos = {}
+        if res_lmk.face_blendshapes and i < len(res_lmk.face_blendshapes):
+            gestos = {
+                c.category_name: round(float(c.score), 3)
+                for c in res_lmk.face_blendshapes[i]
+                if c.category_name in BLENDSHAPES_INTERES
+            }
+        pose = None
+        if res_lmk.facial_transformation_matrixes and i < len(res_lmk.facial_transformation_matrixes):
+            pose = pose_desde_matriz(res_lmk.facial_transformation_matrixes[i])
+        mallas.append({"caja": caja, "puntos": puntos, "gestos": gestos, "pose": pose, "usada": False})
+    return mallas
+
+
+def _puntos_desde_malla(puntos) -> list[dict]:
+    return [{"nombre": nombre,
+             "x": round(sum(puntos[i].x for i in idx) / len(idx), 4),
+             "y": round(sum(puntos[i].y for i in idx) / len(idx), 4)}
+            for nombre, idx in INDICES_MALLA.items()]
 
 
 def _con_margen(caja: dict, margen_x: float, margen_y: float) -> dict:
@@ -87,7 +134,8 @@ class MotorVision:
         umbral = self.cfg.umbral_deteccion if umbral is None else umbral
         img_bgr = self._preparar(img_bgr)
         h, w = img_bgr.shape[:2]
-        rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+        img_det = compensar_luz(img_bgr, self.cfg.brillo_objetivo_deteccion, self.cfg.gamma_min)
+        rgb = cv2.cvtColor(img_det, cv2.COLOR_BGR2RGB)
         imagen_mp = self._mp.Image(image_format=self._mp.ImageFormat.SRGB, data=np.ascontiguousarray(rgb))
 
         with self._lock:
@@ -95,22 +143,7 @@ class MotorVision:
             res_lmk = self.landmarker.detect(imagen_mp)
 
         # --- Malla facial (FaceLandmarker) ---
-        mallas = []
-        for i, puntos in enumerate(res_lmk.face_landmarks or []):
-            xs = [p.x for p in puntos]
-            ys = [p.y for p in puntos]
-            caja = {"x": min(xs), "y": min(ys), "ancho": max(xs) - min(xs), "alto": max(ys) - min(ys)}
-            gestos = {}
-            if res_lmk.face_blendshapes and i < len(res_lmk.face_blendshapes):
-                gestos = {
-                    c.category_name: round(float(c.score), 3)
-                    for c in res_lmk.face_blendshapes[i]
-                    if c.category_name in BLENDSHAPES_INTERES
-                }
-            pose = None
-            if res_lmk.facial_transformation_matrixes and i < len(res_lmk.facial_transformation_matrixes):
-                pose = pose_desde_matriz(res_lmk.facial_transformation_matrixes[i])
-            mallas.append({"caja": caja, "puntos": puntos, "gestos": gestos, "pose": pose, "usada": False})
+        mallas = _extraer_mallas(res_lmk)
 
         # --- Detecciones (FaceDetector) ---
         rostros = []
@@ -149,9 +182,10 @@ class MotorVision:
                 "gestos": {},
                 "malla": None,
             }
-            rostro["mascarilla"] = detectar_mascarilla(img_bgr, rostro["puntos_clave"], self.cfg)
             if mejor is not None:
                 mejor["usada"] = True
+                if len(mejor["puntos"]) > max(i for idx in INDICES_MALLA.values() for i in idx):
+                    rostro["puntos_clave"] = _puntos_desde_malla(mejor["puntos"])
                 # La malla cubre la cara entera (frente a barbilla); la caja del detector deja fuera
                 # la frente y con mascarilla puede quedar desplazada. Calidad y distancia siguen
                 # midiéndose con la caja del detector, para la que están calibrados los umbrales.
@@ -161,6 +195,7 @@ class MotorVision:
                 rostro["num_puntos_malla"] = len(mejor["puntos"])
                 if incluir_malla:
                     rostro["malla"] = [[round(p.x, 4), round(p.y, 4)] for p in mejor["puntos"]]
+            rostro["mascarilla"] = detectar_mascarilla(img_bgr, rostro["puntos_clave"], self.cfg)
             rostros.append(rostro)
 
         rostros.sort(key=lambda r: r["caja"]["ancho"], reverse=True)  # el más cercano primero

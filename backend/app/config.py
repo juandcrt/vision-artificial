@@ -64,6 +64,10 @@ class Config:
     ventana_vivacidad_s: float = 8.0   # el parpadeo debe ocurrir en esta ventana
     frames_estables: int = 5           # frames válidos consecutivos para aprobar
 
+    # --- Mascarilla (solo informativa: no cambia la validación) ---
+    mascarilla_tolerancia_color: float = 18.0  # distancia máx. en (Cr, Cb) para contar un píxel como piel
+    mascarilla_piel_min: float = 0.35          # con menos piel que esto en boca/barbilla -> mascarilla
+
     # --- Servidor ---
     zona_horaria: str = field(default_factory=lambda: os.getenv("VF_ZONA_HORARIA", "America/Lima"))
     origenes_cors: tuple[str, ...] = ("*",)

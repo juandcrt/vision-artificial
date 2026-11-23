@@ -11,6 +11,7 @@ import numpy as np
 
 from ..config import CONFIG, Config
 from .calidad import iou, medir_calidad, pose_desde_matriz
+from .mascarilla import detectar_mascarilla
 
 log = logging.getLogger("vision.motor")
 
@@ -129,6 +130,7 @@ class MotorVision:
                 "gestos": {},
                 "malla": None,
             }
+            rostro["mascarilla"] = detectar_mascarilla(img_bgr, rostro["puntos_clave"], self.cfg)
             # Asociar la malla con mayor solapamiento
             mejor, mejor_iou = None, 0.25
             for m in mallas:

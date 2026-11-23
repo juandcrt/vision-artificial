@@ -27,6 +27,7 @@ Aplicaciones: seguridad, control de acceso y monitoreo inteligente.
 │   │                       MediaPipe FaceLandmarker→ 478 puntos, gestos, │
 │   │                                                  pose de la cabeza   │
 │   ├─ vision/calidad.py    OpenCV: brillo, contraste, nitidez (Laplaciano)│
+│   ├─ vision/mascarilla.py OpenCV: piel en boca/barbilla vs. entrecejo     │
 │   ├─ vision/validacion.py Reglas de acceso + prueba de vida (parpadeo)  │
 │   └─ eventos.py           Bitácora SQLite (solo metadatos)              │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -83,6 +84,9 @@ El resto de umbrales (brillo, nitidez, ángulos, ventana de vivacidad) está en 
 - **Umbral de confianza:** descarta detecciones débiles.
 - **FPS máximos / Resolución de análisis:** equilibran fluidez vs. precisión según la PC.
 - **Malla facial (478):** dibuja los puntos faciales de MediaPipe Face Landmarker.
+- **Mascarilla:** la etiqueta de cada rostro indica *Mascarilla detectada* o *Sin mascarilla*. Se compara el
+  tono de piel del entrecejo con el de la zona de boca y barbilla (OpenCV, espacio YCrCb). Es informativa:
+  no cambia las reglas de validación. Una mascarilla de color piel podría no detectarse.
 - **Capturar:** descarga un PNG del fotograma con las detecciones dibujadas.
 - **Registro de eventos:** cambios de estado (Validado / Observado) con hora, sesión y motivo.
 
@@ -137,6 +141,7 @@ curl -F "imagen=@foto.jpg" "http://localhost:8000/api/detectar?malla=false&modo=
     "pose": {"yaw": -4.1, "pitch": 6.3, "roll": 1.2},
     "gestos": {"eyeBlinkLeft": 0.03, "eyeBlinkRight": 0.04, "jawOpen": 0.01},
     "calidad": {"brillo": 118.5, "contraste": 41.2, "nitidez": 132.7, "tamano": 0.28},
+    "mascarilla": {"detectada": false, "piel_inferior": 0.93},
     "malla": null
   }],
   "validacion": {"estado": "VALIDADO", "motivos": [], "parpadeos": 0,
@@ -190,6 +195,7 @@ vision-facial-ia/
 │   │   └── vision/
 │   │       ├── motor.py       MediaPipe FaceDetector + FaceLandmarker
 │   │       ├── calidad.py     OpenCV: brillo, nitidez, pose, IoU
+│   │       ├── mascarilla.py  Detección de mascarilla
 │   │       ├── validacion.py  Reglas de acceso y prueba de vida
 │   │       └── modelos.py     Descarga automática de modelos
 │   ├── tests/test_sistema.py

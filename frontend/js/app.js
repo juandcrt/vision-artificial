@@ -274,7 +274,8 @@ function dibujar(res, destino = ctx, dims = null) {
 
     if (estado.opciones.cajas) {
       esquinas(destino, x0, y0, bw, bh, color);
-      const etiqueta = `Rostro ${i + 1} · ${Math.round(r.confianza * 100)}%`;
+      const mascarilla = r.mascarilla ? (r.mascarilla.detectada ? " · Mascarilla detectada" : " · Sin mascarilla") : "";
+      const etiqueta = `Rostro ${i + 1} · ${Math.round(r.confianza * 100)}%${mascarilla}`;
       destino.font = "600 12px system-ui, sans-serif";
       const tw = destino.measureText(etiqueta).width + 12;
       destino.fillStyle = color;

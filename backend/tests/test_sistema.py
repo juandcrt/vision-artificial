@@ -8,6 +8,7 @@ from app.config import Config
 from app.eventos import RegistroEventos
 from app.main import crear_app
 from app.vision.calidad import iou, medir_calidad, pose_desde_matriz
+from app.vision.mascarilla import detectar_mascarilla
 from app.vision.validacion import (OBSERVADO, SIN_ROSTRO, VALIDADO, VERIFICANDO, EstadoSesion, evaluar)
 
 CFG = Config()
@@ -79,6 +80,36 @@ def test_pose_identidad_y_iou():
     assert pose_desde_matriz(np.eye(4)) == {"yaw": 0.0, "pitch": 0.0, "roll": 0.0}
     a = {"x": 0, "y": 0, "ancho": 1, "alto": 1}
     assert iou(a, a) == 1 and iou(a, {"x": 2, "y": 2, "ancho": 1, "alto": 1}) == 0
+
+
+# ---------------------------------------------------------------- mascarilla
+PUNTOS_CARA = [  # cara sintética de 200x200: ojos, nariz y boca
+    {"nombre": "ojo_derecho", "x": 0.35, "y": 0.35}, {"nombre": "ojo_izquierdo", "x": 0.65, "y": 0.35},
+    {"nombre": "nariz", "x": 0.5, "y": 0.5}, {"nombre": "boca", "x": 0.5, "y": 0.65},
+]
+
+
+def cara_sintetica():
+    img = np.full((200, 200, 3), (60, 60, 60), np.uint8)  # fondo
+    cv2.ellipse(img, (100, 100), (70, 90), 0, 0, 360, (120, 150, 200), -1)  # piel (BGR)
+    return img
+
+
+def test_sin_mascarilla():
+    r = detectar_mascarilla(cara_sintetica(), PUNTOS_CARA)
+    assert r["detectada"] is False and r["piel_inferior"] > 0.9
+
+
+@pytest.mark.parametrize("color", [(230, 200, 160), (240, 240, 240), (25, 25, 25)])  # celeste, blanca, negra
+def test_con_mascarilla(color):
+    img = cara_sintetica()
+    cv2.rectangle(img, (40, 85), (160, 175), color, -1)  # cubre de la nariz a la barbilla
+    r = detectar_mascarilla(img, PUNTOS_CARA)
+    assert r["detectada"] is True and r["piel_inferior"] < 0.1
+
+
+def test_mascarilla_sin_puntos():
+    assert detectar_mascarilla(cara_sintetica(), PUNTOS_CARA[:2]) is None
 
 
 # ---------------------------------------------------------------- API

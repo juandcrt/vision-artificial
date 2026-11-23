@@ -217,3 +217,12 @@ def test_caja_con_margen_no_sale_de_la_imagen():
     assert c == {"x": 0.38, "y": 0.38, "ancho": 0.24, "alto": 0.24}
     borde = _con_margen({"x": 0.0, "y": 0.9, "ancho": 0.2, "alto": 0.1}, 0.1, 0.5)
     assert borde["x"] == 0.0 and borde["y"] + borde["alto"] <= 1.0
+
+
+def test_quitar_rostro_fantasma_pegado_a_un_rostro_real():
+    from app.vision.motor import quitar_duplicados
+    real = {"caja": {"x": 0.4, "y": 0.2, "ancho": 0.2, "alto": 0.3}, "pose": {"yaw": 0, "pitch": 0, "roll": 0}}
+    cuello = {"caja": {"x": 0.42, "y": 0.4, "ancho": 0.18, "alto": 0.3}, "pose": None}   # debajo, solapado
+    otra_persona = {"caja": {"x": 0.05, "y": 0.2, "ancho": 0.2, "alto": 0.3}, "pose": None}  # aparte
+    assert quitar_duplicados([real, cuello, otra_persona]) == [real, otra_persona]
+    assert quitar_duplicados([cuello]) == [cuello]  # sin rostro real no hay con qué compararlo

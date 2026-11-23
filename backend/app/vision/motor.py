@@ -67,6 +67,24 @@ def _puntos_desde_malla(puntos) -> list[dict]:
             for nombre, idx in INDICES_MALLA.items()]
 
 
+def quitar_duplicados(rostros: list[dict], solape_max: float = 0.3) -> list[dict]:
+    """Elimina detecciones sin malla que se superponen con un rostro que sí la tiene.
+
+    Con mascarilla y poca luz el detector a veces marca, además de la cara, la zona de la barbilla
+    y el cuello como un segundo rostro. Ese "fantasma" no tiene malla y queda pegado al rostro real.
+    """
+    con_malla = [r for r in rostros if r.get("pose") is not None]
+
+    def solape(a: dict, b: dict) -> float:  # fracción de la caja a cubierta por b
+        iw = max(0.0, min(a["x"] + a["ancho"], b["x"] + b["ancho"]) - max(a["x"], b["x"]))
+        ih = max(0.0, min(a["y"] + a["alto"], b["y"] + b["alto"]) - max(a["y"], b["y"]))
+        area = a["ancho"] * a["alto"]
+        return iw * ih / area if area > 0 else 0.0
+
+    return [r for r in rostros
+            if r.get("pose") is not None or all(solape(r["caja"], o["caja"]) <= solape_max for o in con_malla)]
+
+
 def _con_margen(caja: dict, margen_x: float, margen_y: float) -> dict:
     """Amplía una caja normalizada (fracción de su tamaño por lado) sin salirse de la imagen."""
     x0 = max(caja["x"] - caja["ancho"] * margen_x, 0.0)
@@ -195,9 +213,13 @@ class MotorVision:
                 rostro["num_puntos_malla"] = len(mejor["puntos"])
                 if incluir_malla:
                     rostro["malla"] = [[round(p.x, 4), round(p.y, 4)] for p in mejor["puntos"]]
-            rostro["mascarilla"] = detectar_mascarilla(img_bgr, rostro["puntos_clave"], self.cfg)
+            # Sin malla los puntos del detector pueden caer fuera de la cara (p. ej. en el cuello con
+            # mascarilla y poca luz): mejor no informar mascarilla que informar algo falso.
+            rostro["mascarilla"] = (detectar_mascarilla(img_bgr, rostro["puntos_clave"], self.cfg)
+                                    if mejor is not None else None)
             rostros.append(rostro)
 
+        rostros = quitar_duplicados(rostros)
         rostros.sort(key=lambda r: r["caja"]["ancho"], reverse=True)  # el más cercano primero
         for i, r in enumerate(rostros):
             r["id"] = i
